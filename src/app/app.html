@@ -1,0 +1,336 @@
+<div class="pokedex-app" [class.dark-theme]="isDarkMode()">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="camera-lens">
+        <div class="lens-glare"></div>
+      </div>
+      <div class="status-lights">
+        <span class="light red"></span>
+        <span class="light yellow"></span>
+        <span class="light green"></span>
+      </div>
+      <h1 class="app-title">Pokédex Agent</h1>
+    </div>
+
+    <div class="header-right">
+      <button class="theme-toggle" (click)="toggleTheme()" title="Toggle Dark/Light Mode">
+        @if (isDarkMode()) {
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="5" />
+            <path
+              d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+            />
+          </svg>
+        } @else {
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        }
+      </button>
+
+      <button class="reset-session-btn" (click)="resetSession()" title="New Chat Session">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+        </svg>
+        <span>Reset Session</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Layout Body -->
+  <main class="main-container">
+    <!-- Sidebar - Quick Prompts & Session Info -->
+    <aside class="sidebar" [class.open]="sidebarOpen()">
+      <div class="sidebar-header">
+        <h3>Pokédex Assistant</h3>
+        <span class="session-badge" title="Persistent Memory ID">
+          ID: {{ sessionId().substring(0, 8) }}...
+        </span>
+      </div>
+
+      <div class="quick-prompts-section">
+        <label class="section-label">Suggested Queries</label>
+        <div class="prompt-chips">
+          @for (prompt of suggestedPrompts; track prompt) {
+            <button class="chip" (click)="useSuggestedPrompt(prompt)" [disabled]="loading()">
+              <span>⚡</span> {{ prompt }}
+            </button>
+          }
+        </div>
+      </div>
+    </aside>
+
+    <!-- Chat Main Panel -->
+    <section class="chat-viewport">
+      <!-- Message Feed Stream -->
+      <div #scrollContainer class="messages-feed">
+        @if (messages().length === 0) {
+          <div class="empty-state">
+            <div class="pokeball-icon">
+              <div class="pokeball-top"></div>
+              <div class="pokeball-center"></div>
+              <div class="pokeball-bottom"></div>
+            </div>
+            <h2>Awaiting Pokédex Commands</h2>
+            <p>
+              Ask about any Pokémon to view base stats, audio cries, Japanese names, and evolutions!
+            </p>
+          </div>
+        }
+
+        @for (msg of messages(); track msg.id) {
+          <div
+            class="message-row"
+            [class.user-row]="msg.sender === 'user'"
+            [class.agent-row]="msg.sender === 'agent'"
+          >
+            <div class="avatar">
+              @if (msg.sender === 'user') {
+                <div class="user-avatar">Trainer</div>
+              } @else {
+                <div class="agent-avatar">Dex</div>
+              }
+            </div>
+
+            <div class="message-content">
+              <!-- Message Bubble Header -->
+              <div class="message-meta">
+                <span class="sender-name">{{
+                  msg.sender === 'user' ? 'You' : 'Pokédex Agent'
+                }}</span>
+                <span class="timestamp">{{ msg.timestamp | date: 'shortTime' }}</span>
+              </div>
+
+              <!-- Text Response Bubble -->
+              <div class="bubble">
+                <p class="text-payload">{{ msg.text }}</p>
+              </div>
+
+              <!-- Rich Inline Pokémon Card Component -->
+              @for (pokemonCard of msg.pokemonCards; track $index) {
+                <div class="pokemon-card-container">
+                  <div class="pokemon-card">
+                    <!-- Card Header -->
+                    <div class="card-header">
+                      <div class="title-wrap">
+                        <h3 class="name">{{ pokemonCard.pokemon_name }}</h3>
+                        <span class="japanese-name">{{ pokemonCard.japanese_name }}</span>
+                      </div>
+                      <span class="genera-badge">{{ pokemonCard.genera }}</span>
+                    </div>
+
+                    <!-- Card Body Details -->
+                    <div class="card-body">
+                      <!-- Visual Media Left -->
+                      <div class="media-col">
+                        <div class="sprite-wrapper">
+                          <img
+                            [src]="pokemonCard.image"
+                            [alt]="pokemonCard.pokemon_name"
+                            class="official-art"
+                          />
+                        </div>
+
+                        @if (pokemonCard.audio_cries) {
+                          <button
+                            class="cry-audio-btn"
+                            (click)="playCry(pokemonCard.audio_cries)"
+                            [class.playing]="
+                              currentlyPlayingAudio() === pokemonCard.audio_cries
+                            "
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                            >
+                              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                              <path
+                                d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"
+                              />
+                            </svg>
+                            <span>{{
+                              currentlyPlayingAudio() === pokemonCard.audio_cries
+                                ? 'Playing...'
+                                : 'Play Audio Cry'
+                            }}</span>
+                          </button>
+                        }
+                      </div>
+
+                      <!-- Base Stats & Info Right -->
+                      <div class="stats-col">
+                        <div class="physical-traits">
+                          <div class="trait">
+                            <span class="label">Height:</span> {{ pokemonCard.stats.height }} m
+                          </div>
+                          <div class="trait">
+                            <span class="label">Weight:</span> {{ pokemonCard.stats.weight }} kg
+                          </div>
+                        </div>
+
+                        <!-- Evolution Chain Box -->
+                        <div class="evolution-box">
+                          <span class="evo-label">Evolution Chain:</span>
+                          <div class="evo-path">{{ pokemonCard.evolution_chain }}</div>
+                        </div>
+
+                        <!-- Stat Gauges Grid -->
+                        <div class="stats-grid">
+                          <div class="stat-row">
+                            <span class="stat-name">HP</span>
+                            <span class="stat-value">{{ pokemonCard.stats.hp }}</span>
+                            <div class="bar-track">
+                              <div
+                                class="bar-fill hp"
+                                [style.width.%]="getStatPercentage(pokemonCard.stats.hp)"
+                              ></div>
+                            </div>
+                          </div>
+                          <div class="stat-row">
+                            <span class="stat-name">ATK</span>
+                            <span class="stat-value">{{ pokemonCard.stats.attack }}</span>
+                            <div class="bar-track">
+                              <div
+                                class="bar-fill atk"
+                                [style.width.%]="getStatPercentage(pokemonCard.stats.attack)"
+                              ></div>
+                            </div>
+                          </div>
+                          <div class="stat-row">
+                            <span class="stat-name">DEF</span>
+                            <span class="stat-value">{{ pokemonCard.stats.defense }}</span>
+                            <div class="bar-track">
+                              <div
+                                class="bar-fill def"
+                                [style.width.%]="getStatPercentage(pokemonCard.stats.defense)"
+                              ></div>
+                            </div>
+                          </div>
+                          <div class="stat-row">
+                            <span class="stat-name">SP.ATK</span>
+                            <span class="stat-value">{{
+                              pokemonCard.stats.special_attack
+                            }}</span>
+                            <div class="bar-track">
+                              <div
+                                class="bar-fill spatk"
+                                [style.width.%]="
+                                  getStatPercentage(pokemonCard.stats.special_attack)
+                                "
+                              ></div>
+                            </div>
+                          </div>
+                          <div class="stat-row">
+                            <span class="stat-name">SP.DEF</span>
+                            <span class="stat-value">{{
+                              pokemonCard.stats.special_defense
+                            }}</span>
+                            <div class="bar-track">
+                              <div
+                                class="bar-fill spdef"
+                                [style.width.%]="
+                                  getStatPercentage(pokemonCard.stats.special_defense)
+                                "
+                              ></div>
+                            </div>
+                          </div>
+                          <div class="stat-row">
+                            <span class="stat-name">SPD</span>
+                            <span class="stat-value">{{ pokemonCard.stats.speed }}</span>
+                            <div class="bar-track">
+                              <div
+                                class="bar-fill spd"
+                                [style.width.%]="getStatPercentage(pokemonCard.stats.speed)"
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Loading Spinner & Typing Indicator -->
+        @if (loading()) {
+          <div class="message-row agent-row loading-row">
+            <div class="avatar">
+              <div class="agent-avatar">Dex</div>
+            </div>
+            <div class="bubble loading-bubble">
+              <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <span class="loading-text">Analyzing PokéAPI records...</span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Input Bar Area -->
+      <footer class="input-container">
+        <form (submit)="sendMessage(); $event.preventDefault()" class="chat-form">
+          <input
+            #userInput
+            type="text"
+            class="query-input"
+            name="userQuery"
+            [ngModel]="currentInput()"
+            (ngModelChange)="currentInput.set($event)"
+            placeholder="Ask Pokédex Agent... (e.g. Tell me about Lucario)"
+            [disabled]="loading()"
+          />
+          <button type="submit" class="send-btn" [disabled]="loading() || !currentInput().trim()">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </button>
+        </form>
+      </footer>
+    </section>
+  </main>
+</div>
