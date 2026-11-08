@@ -40,7 +40,9 @@ export interface ChatApiResponse {
   status: number;
   session_id: string;
   response: {
-    pokemon_card: PokemonCardData[];
+    pokemon_card: {
+      result: PokemonCardData | PokemonCardData[] | null;
+    };
     description: string;
   };
 }
@@ -137,24 +139,26 @@ export class App {
           session_id: this.sessionId(),
           response: {
             description: `Pikachu is an Electric-type Mouse Pokémon. It stores electricity in its cheek sacs and releases powerful electrical discharges when threatened.`,
-            pokemon_card: [{
-              image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png',
-              pokemon_name: 'Pikachu',
-              japanese_name: 'ピカチュウ',
-              genera: 'Mouse Pokémon',
-              evolution_chain: 'Pichu → Pikachu → Raichu',
-              audio_cries: 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/25.ogg',
-              stats: {
-                hp: 35,
-                height: 0.4,
-                weight: 6.0,
-                attack: 55,
-                defense: 40,
-                special_attack: 50,
-                special_defense: 50,
-                speed: 90
-              }
-            }]
+            pokemon_card: {
+              result: [{
+                image: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png',
+                pokemon_name: 'Pikachu',
+                japanese_name: 'ピカチュウ',
+                genera: 'Mouse Pokémon',
+                evolution_chain: 'Pichu → Pikachu → Raichu',
+                audio_cries: 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/25.ogg',
+                stats: {
+                  hp: 35,
+                  height: 0.4,
+                  weight: 6.0,
+                  attack: 55,
+                  defense: 40,
+                  special_attack: 50,
+                  special_defense: 50,
+                  speed: 90
+                }
+              }]
+            }
           },
         };
 
@@ -169,12 +173,17 @@ export class App {
   private handleApiResponse(response: ChatApiResponse) {
     this.sessionId.set(response.session_id);
 
+    const pokemonCard = response.response.pokemon_card?.result || [];
     const agentMsg: ChatMessage = {
       id: crypto.randomUUID(),
       sender: 'agent',
       text: response.response.description,
       timestamp: new Date(),
-      pokemonCards: response.response.pokemon_card
+      pokemonCards: Array.isArray(pokemonCard)
+        ? pokemonCard
+        : pokemonCard
+          ? [pokemonCard]
+          : []
     };
 
     this.messages.update(prev => [...prev, agentMsg]);
